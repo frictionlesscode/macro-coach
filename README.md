@@ -29,6 +29,17 @@ know the conventions. Concretely, this skill prevents:
   not hidden.
 - Claiming a body-fat reading was synced to Garmin when that push is a documented no-op.
 - Getting `rate_lb_per_week`'s sign backwards and inverting a cut into a bulk.
+- **Reading a `null` as a missing feature.** This one happened for real: a
+  `targets_null_reason` was taken as proof the target engine didn't exist, so macros got
+  hand-calculated in chat for a system that could have resolved them. The actual blocker was
+  an unset goal — one call away. The skill now maps each null reason to the action it implies.
+- **Framing fixed and derived targets as either/or.** A user with an existing fixed-macro plan
+  doesn't have to choose: `set_goal` and explicit `set_day_plan` macros compose, so the goal
+  can start accumulating TDEE while their current numbers stay in force, migrating a day at a
+  time.
+- **Letting a flat TDEE read as "nothing is happening."** Energy balance can't see
+  recomposition — flat weight with a shrinking waist is real progress the estimate is blind
+  to, and that's worth saying out loud rather than reporting maintenance as a verdict.
 
 ## What it covers
 

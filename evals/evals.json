@@ -48,6 +48,30 @@
       "prompt": "Mondays and Thursdays are my heavy lifting days, can you set that up and tell me what I should eat today (it's Monday)?",
       "expected_output": "Calls set_training_plan with weekday 0 (Monday) and 3 (Thursday) mapped to 'heavy'. Then calls get_targets or get_day for today and reports the real resolved targets with day_type='heavy' -- or, if no goal is active yet or TDEE/weight data isn't available, reports the specific targets_null_reason instead of guessing macros.",
       "files": []
+    },
+    {
+      "id": 9,
+      "prompt": "get_day is returning targets: null. Is the target engine not built yet?",
+      "expected_output": "Reads targets_null_reason rather than inferring build state. If it says 'no active goal set', explains the engine IS built and the blocker is an unset goal, then offers to call set_goal. Explicitly does NOT tell the user the feature is unimplemented, and does not start hand-calculating macros in chat as a substitute.",
+      "files": []
+    },
+    {
+      "id": 10,
+      "prompt": "I already run fixed macros by day type -- 190P every day, carbs and fat varying by training/rest. Should I switch to this system's goal thing or keep what I have?",
+      "expected_output": "Does not present this as either/or. Explains set_goal and explicit set_day_plan macros compose: set the goal now so TDEE starts accumulating, keep pushing explicit macros for days being eaten to, and migrate a day at a time by dropping overrides. Notes explicit days still count against the weekly budget (excluded from carb distribution, not from accounting).",
+      "files": []
+    },
+    {
+      "id": 11,
+      "prompt": "My weight has been flat for four weeks but my waist is down an inch. What will the TDEE estimate tell me?",
+      "expected_output": "Explains that with flat weight the weight-change term is ~0, so TDEE converges on mean intake -- confirming rather than revealing. Explicitly flags that energy balance cannot see recomposition, so it will report maintenance while missing real composition progress, and does not let that read as 'nothing is happening'. Suggests log_body_comp as the signal that catches what the scale hides.",
+      "files": []
+    },
+    {
+      "id": 12,
+      "prompt": "Set tomorrow to 190g protein, 60g carbs, 32g fat.",
+      "expected_output": "Calls set_day_plan with those macros and without inventing a kcal figure. Reports back the derived energy (~1288 kcal via Atwater) that the tool returns, rather than claiming calories are missing or that the tool stored zero.",
+      "files": []
     }
   ]
 }

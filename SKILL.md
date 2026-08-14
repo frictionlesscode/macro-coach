@@ -1,6 +1,6 @@
 ---
 name: macro-coach
-description: Use this skill whenever the user tells you what they ate, sends a photo of food/a plate/a nutrition label, asks you to log a meal, asks what they've eaten today/this week, asks about their calories or macros or remaining targets, asks to save a food or recipe for reuse, or wants to set/change a cut/bulk/maintain goal or training-day plan. Trigger on phrases like "log this", "I just had...", a food photo with no further comment, "what have I eaten today", "how many calories do I have left", "save this so I don't have to re-estimate it", "what's my TDEE/expenditure", "let's start a cut", "I want to lose a pound a week", "Monday and Thursday are heavy days". Covers estimating/recording food, reading back what's stored, and setting/reading real weekly-budget-resolved targets and goals. Does NOT cover weekly review synthesis, chart rendering, or reading Garmin data alongside this -- those need pieces that don't exist yet (see "What this skill does not do").
+description: Use this skill whenever the user tells you what they ate, sends a photo of food/a plate/a nutrition label, asks you to log a meal, asks what they've eaten today/this week, asks about their calories or macros or remaining targets, asks to save a food or recipe for reuse, or wants to set/change a cut/bulk/maintain goal or training-day plan. Trigger on phrases like "log this", "I just had...", a food photo with no further comment, "what have I eaten today", "how many calories do I have left", "save this so I don't have to re-estimate it", "what's my TDEE/expenditure", "let's start a cut", "I want to lose a pound a week", "Monday and Thursday are heavy days". Also use it before concluding that any macro-mcp capability is missing or unbuilt -- food logging, the personal food library, body composition, adaptive TDEE, goals, training-day plans, and weekly-budget target resolution are all live, and a null value means a data state (usually an unset goal or too few complete days) rather than an unimplemented feature. Does NOT cover weekly review synthesis, chart rendering, or reading Garmin data alongside this -- see "What this skill does not do".
 ---
 
 # Macro Coach
@@ -67,6 +67,63 @@ pass `planned=True`. Never let a planned meal contribute to `get_day`'s actual t
 day's logging-completeness status -- that's enforced server-side, but don't describe a planned
 meal as already eaten either.
 
+## A null is a state, not a missing feature
+
+**Every capability described in this skill is built and live.** When something comes back
+`null`, read the accompanying `*_null_reason` and treat it as a description of the current
+*data state* — almost always something the user can fix in one call. Never infer from a `null`
+that the server is unfinished, and never tell the user a feature "isn't implemented yet"
+unless this skill's "What this skill does not do" section explicitly lists it.
+
+This has actually gone wrong: a `targets_null_reason` was once read as proof the target engine
+didn't exist, which led to hand-calculating macros in chat for a system that could have
+resolved them. The real blocker was an unset goal — one `set_goal` call away.
+
+| `targets_null_reason` says | What it means | Do this |
+|---|---|---|
+| "no active goal set" | The engine works; nothing to resolve against. | Offer to `set_goal`. |
+| "no TDEE available yet…" / "only N complete day(s)…" | Not enough `complete` days yet. | Say how many more are needed; push for `set_day_status`. |
+| "…weigh-ins…span only N day(s)" | Not enough weight history from garmin-mcp. | More weigh-ins; nothing to fix in software. |
+| mentions garmin-mcp unreachable/login | Bridge is down. | An ops problem, not a data one — say so plainly. |
+
+If a reason is ever phrased in terms of build state rather than data state, treat that as a
+bug in the message and report it rather than repeating it to the user as fact.
+
+## Fixed targets and derived targets are not a fork
+
+A user arriving with an existing plan (fixed macros per day type) does **not** have to choose
+between keeping it and using the goal engine. They compose, and proposing them as either/or is
+a mistake:
+
+- `set_goal` and `set_day_plan` are independent. Setting a goal never overwrites explicit day
+  macros; an explicit day always wins for its own date.
+- Explicit days **do** count against the weekly energy budget — they're excluded from carb
+  *distribution*, not from the accounting.
+- So the right default is **both at once**: set the goal now (it costs nothing and starts TDEE
+  accumulating), and keep writing explicit macros for the days they're actually eating to.
+- Migrate one day at a time. Dropping an override lets that date fall through to resolution.
+  No cutover, no week of `null` targets, nothing abandoned.
+
+Recommend that hybrid unless the user explicitly wants one or the other.
+
+## What the expenditure estimate can and cannot see
+
+Worth being straight about with anyone whose scale is flat:
+
+- TDEE is `mean intake + weight-change term`. When weight is flat, that second term is ~0, so
+  the estimate converges on their actual mean intake. If they already had a decent estimate,
+  the system will mostly **confirm** it rather than reveal a surprise. The value is the
+  confidence level and the drift tracking, not a shocking new number — don't oversell it.
+- **It cannot see recomposition.** Flat weight with a shrinking waist is real progress that
+  energy balance is blind to, because it reads weight, not composition. It will correctly say
+  "maintenance" while missing that things are improving. Say this rather than letting a flat
+  TDEE read as "nothing is happening."
+- Relatedly, `kcal_per_lb` assumes fat, so it's wrong during recomp — though when weight is
+  flat that term is near zero, so it barely matters. The estimate is *most* trustworthy exactly
+  when the scale isn't moving.
+- For these users, `log_body_comp` matters more than usual: it's the only signal in the system
+  that catches what the scale hides.
+
 ## Setting and changing a goal
 
 `set_goal(mode, rate_lb_per_week, protein_g_per_lb, fat_g_per_lb_floor, stop_metric, stop_value)`
@@ -95,7 +152,16 @@ soften the numbers you were asked to set, and don't silently refuse either.
 for Monday/Thursday training days -- `"0"`=Monday..`"6"`=Sunday). `set_day_plan(date, day_type=...)`
 overrides one specific date; `set_day_plan(date, macros={...})` gives that date fully explicit
 macros instead of day-type resolution (useful for "I'm eating out Saturday, just let me plan it
-myself"). A `day_plan` override always beats `training_plan`'s recurring pattern for that date.
+myself", or for carrying over an existing fixed plan -- see "not a fork" above). A `day_plan`
+override always beats `training_plan`'s recurring pattern for that date.
+
+**Explicit macros: energy is derived if you omit it.** Passing only protein/carb/fat is fine --
+`kcal` is computed via Atwater (4/4/9) and the response sets `kcal_derived_from_macros: true`
+with a note. Pass `kcal` explicitly only when you have a real reason to state a different
+figure; a supplied value is never overwritten, only flagged if it disagrees with the macros.
+Note this is the opposite of `log_food`, which never derives or rewrites calories -- a *target*
+is a specification with one well-defined energy content, while a *logged entry* has a
+user-stated number worth preserving verbatim.
 
 `get_goal()` returns `{"active": false}` if nothing is set. When active, it reports `progress`,
 `projected_completion` (extrapolated from the current trend rate -- can be `null` with a
