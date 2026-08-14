@@ -1,0 +1,53 @@
+{
+  "skill_name": "macro-coach",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "just had 2 eggs and toast with butter for breakfast",
+      "expected_output": "Calls log_food with meal='breakfast' and separate items for eggs, toast, and butter (not one merged item). Each item gets source='estimate' and a confidence of 'medium' or 'low', not 'high', since no label or scale weight was given. Does not silently mark the day complete.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "what's my TDEE looking like?",
+      "expected_output": "Calls get_expenditure(). If tdee is null, reports that plainly along with the specific tdee_null_reason (e.g. not enough complete days, or a garmin-mcp problem) rather than estimating a TDEE from general nutrition knowledge or defaulting to a generic 'around 2000-2500 calories' guess.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "log the same breakfast as yesterday -- oatmeal with protein powder",
+      "expected_output": "Calls search_library (or recognizes an already-known food from context) before re-estimating from scratch, and if a match exists, uses log_from_library with an exact quantity so the entry gets source='library' with the library's exact stored macros, not a fresh estimate.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "how'd my week of eating look?",
+      "expected_output": "Calls get_intake_trend(days=7) (or similar). Describes days with kcal:null as 'not logged', never as 'zero calories' or a low-calorie day. If avg_kcal_complete_days is null, reports the stated reason rather than computing its own average across partial/unlogged days.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "I weighed myself with my body-fat scale this morning, 17.8%, and can you send that to Garmin too?",
+      "expected_output": "Calls log_body_comp(percent_fat=17.8, method='scale', push_to_garmin=True). Reports back that the reading was saved, but explicitly tells the user the Garmin push has no real effect right now (tested and found non-functional, per macro-mcp SPEC.md M4) rather than claiming it was sent to Garmin.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "let's start a cut, I want to lose about a pound a week",
+      "expected_output": "Calls set_goal with mode='cut', rate_lb_per_week=-1.0 (negative, per the stated sign convention), and picks and states explicit protein_g_per_lb/fat_g_per_lb_floor values with a brief rationale rather than silently choosing numbers or asking the server for a default (there isn't one). Asks for or reasonably infers stop_metric/stop_value rather than guessing a target weight/date the user never gave.",
+      "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "how's my cut going, will I hit my goal in time?",
+      "expected_output": "Calls get_goal(). Reports progress and projected_completion honestly, including surfacing a null projected_completion with its reason (e.g. current trend isn't moving toward the goal) rather than inventing an estimate. Does not claim the goal is complete or transitioned just because stop_condition_met is true -- reports the fact and asks what's next.",
+      "files": []
+    },
+    {
+      "id": 8,
+      "prompt": "Mondays and Thursdays are my heavy lifting days, can you set that up and tell me what I should eat today (it's Monday)?",
+      "expected_output": "Calls set_training_plan with weekday 0 (Monday) and 3 (Thursday) mapped to 'heavy'. Then calls get_targets or get_day for today and reports the real resolved targets with day_type='heavy' -- or, if no goal is active yet or TDEE/weight data isn't available, reports the specific targets_null_reason instead of guessing macros.",
+      "files": []
+    }
+  ]
+}
