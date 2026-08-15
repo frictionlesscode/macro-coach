@@ -1,15 +1,16 @@
 # macro-coach
 
-A Claude Skill that teaches Claude how to log food correctly and reason about macro targets
-through [macro-mcp](https://github.com/frictionlesscode/macro-mcp) — a companion MCP server
-that stores what you eat, estimates your real energy expenditure from how your weight responds
-to it, and resolves that into daily targets.
+A Claude Skill that teaches Claude how to log food and track macro targets correctly through
+[macro-mcp](https://github.com/frictionlesscode/macro-mcp) — a companion MCP server that stores
+whatever macro targets you set per date, logs food against them, computes trend/adherence
+statistics, and renders charts. It also stores progress photos, viewable on a self-hosted
+dashboard.
 
 This is deliberately the **"how to use these tools correctly"** layer. It covers which tool
 answers which question, what each `null` actually means, when to ask rather than assume, and
-where the server has no opinion and Claude must supply one. It contains no nutrition
-philosophy of its own — your goals and preferences live in the conversation, not baked into
-this skill.
+where the server has no opinion and Claude must supply one — TDEE, goals, training-day cadence.
+It contains no nutrition philosophy of its own; those judgments live in the conversation, not
+baked into this skill.
 
 ## Why this exists
 
@@ -19,27 +20,20 @@ know the conventions. Concretely, this skill prevents:
 - Reading a `null` intake day as **zero calories** instead of "not logged" — the difference
   between an honest gap and a fabricated crash diet.
 - Marking a day `complete` just because entries exist for it, when completeness is the user's
-  assertion and silently getting it wrong corrupts the expenditure estimate.
-- Filling in a `null` TDEE with a plausible guess from general nutrition knowledge, defeating
-  the entire point of a server that refuses to fabricate.
+  assertion and silently getting it wrong corrupts trend statistics.
+- Filling in a `null` target or trend statistic with a plausible guess, defeating the entire
+  point of a server that refuses to fabricate.
 - Assuming the meal just logged is first in `get_day`'s list — entries are chronological
   across the whole day, so an edit can land on the wrong meal.
-- Inventing `protein_g_per_lb` / `fat_g_per_lb_floor` silently. The server has **no default**
-  for these on purpose; picking them is a judgment call that should be stated and explained,
-  not hidden.
 - Claiming a body-fat reading was synced to Garmin when that push is a documented no-op.
-- Getting `rate_lb_per_week`'s sign backwards and inverting a cut into a bulk.
-- **Reading a `null` as a missing feature.** This one happened for real: a
-  `targets_null_reason` was taken as proof the target engine didn't exist, so macros got
-  hand-calculated in chat for a system that could have resolved them. The actual blocker was
-  an unset goal — one call away. The skill now maps each null reason to the action it implies.
-- **Framing fixed and derived targets as either/or.** A user with an existing fixed-macro plan
-  doesn't have to choose: `set_goal` and explicit `set_day_plan` macros compose, so the goal
-  can start accumulating TDEE while their current numbers stay in force, migrating a day at a
-  time.
-- **Letting a flat TDEE read as "nothing is happening."** Energy balance can't see
-  recomposition — flat weight with a shrinking waist is real progress the estimate is blind
-  to, and that's worth saying out loud rather than reporting maintenance as a verdict.
+- **Reading a `null` as a missing feature.** This has happened for real: a stale message once
+  survived past the milestone that implemented the feature it described as missing. The skill
+  maps each `*_null_reason` to the action it implies, and calls out that reading explicitly.
+- **Treating stored targets like a resolution engine.** There's no day-type or recurring
+  pattern underneath `set_targets` — it's Claude's job to translate a plan (a training split,
+  a fat-cycling protocol) into explicit per-date numbers, one bulk call.
+- Telling the user their progress photo failed to save because pose alignment failed — the
+  photo is stored either way; alignment only affects the dashboard slideshow.
 
 ## What it covers
 
@@ -47,12 +41,14 @@ know the conventions. Concretely, this skill prevents:
   setting `source` / `confidence` honestly rather than defaulting everything to high.
 - **Using the personal food library** — checking for a repeat before re-estimating, and saving
   foods worth reusing with a serving mass so they can be logged by weight later.
-- **Day-completeness discipline** — why it matters to the expenditure estimate, and why to ask
-  rather than infer.
-- **Setting and reading goals** — cut/bulk/maintain, stop conditions, training-day plans, and
-  the fact that a met stop-condition is reported but never auto-transitions.
-- **Reading results honestly** — surfacing confidence alongside numbers, judging adherence
-  weekly rather than daily, and reporting a `null` with its stated reason instead of guessing.
+- **Setting stored targets** — bulk by date, Atwater-derived energy, no guardrails (the server
+  reports, it doesn't clamp).
+- **Day-completeness discipline** — why it matters to trend statistics, and why to ask rather
+  than infer.
+- **Reading trends and rendering charts** — adherence bias vs. scatter, coverage, suppression
+  on sparse data, and when to reach for `render_trend` instead of raw numbers.
+- **Progress photos** — logging them, and pointing the user at their own `/dashboard` rather
+  than trying to describe or render a photo back in chat.
 
 ## Requirements
 
@@ -77,10 +73,13 @@ editing `SKILL.md` and want a sanity check that it still triggers and reasons co
 
 ## Scope
 
-Not covered yet, because the underlying server pieces don't exist: weekly review synthesis,
-staged target-change proposals (a goal changes immediately today), chart rendering, and
-cross-referencing Garmin training/recovery data to inform nutrition advice. The skill says so
-explicitly rather than improvising answers that sound like they came from real data.
+Not covered, deliberately: TDEE/expenditure estimation, goal tracking, and training-day
+cadence — those aren't server capabilities in the current charter, they're Claude's own
+judgment (informed by the conversation and, if connected, garmin-mcp's training/recovery
+data). Also not covered: barcode/branded-food lookup (not built yet) and weekly-review
+synthesis as a single tool call (build it from `get_trend`/`get_body_comp` in conversation
+instead). The skill says so explicitly rather than improvising answers that sound like they
+came from real data.
 
 ## Related
 
@@ -90,7 +89,7 @@ explicitly rather than improvising answers that sound like they came from real d
 - [garmin-coach](https://github.com/frictionlesscode/garmin-coach) — the sibling skill for
   training and recovery data.
 - [garmin-mcp](https://github.com/frictionlesscode/garmin-mcp) — the Garmin data server
-  macro-mcp pulls weight from.
+  macro-mcp's dashboard reads a weight trend from (display only — see macro-mcp's SPEC.md).
 
 ## License
 

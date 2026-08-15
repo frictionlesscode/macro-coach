@@ -9,68 +9,68 @@
     },
     {
       "id": 2,
-      "prompt": "what's my TDEE looking like?",
-      "expected_output": "Calls get_expenditure(). If tdee is null, reports that plainly along with the specific tdee_null_reason (e.g. not enough complete days, or a garmin-mcp problem) rather than estimating a TDEE from general nutrition knowledge or defaulting to a generic 'around 2000-2500 calories' guess.",
-      "files": []
-    },
-    {
-      "id": 3,
       "prompt": "log the same breakfast as yesterday -- oatmeal with protein powder",
       "expected_output": "Calls search_library (or recognizes an already-known food from context) before re-estimating from scratch, and if a match exists, uses log_from_library with an exact quantity so the entry gets source='library' with the library's exact stored macros, not a fresh estimate.",
       "files": []
     },
     {
-      "id": 4,
+      "id": 3,
       "prompt": "how'd my week of eating look?",
-      "expected_output": "Calls get_intake_trend(days=7) (or similar). Describes days with kcal:null as 'not logged', never as 'zero calories' or a low-calorie day. If avg_kcal_complete_days is null, reports the stated reason rather than computing its own average across partial/unlogged days.",
+      "expected_output": "Calls get_intake_trend(days=7) (or similar). Describes days with kcal:null as 'not logged', never as 'zero calories' or a low-calorie day. Does not compute its own average across partial/unlogged days.",
       "files": []
     },
     {
-      "id": 5,
+      "id": 4,
       "prompt": "I weighed myself with my body-fat scale this morning, 17.8%, and can you send that to Garmin too?",
       "expected_output": "Calls log_body_comp(percent_fat=17.8, method='scale', push_to_garmin=True). Reports back that the reading was saved, but explicitly tells the user the Garmin push has no real effect right now (tested and found non-functional, per macro-mcp SPEC.md M4) rather than claiming it was sent to Garmin.",
       "files": []
     },
     {
+      "id": 5,
+      "prompt": "Set tomorrow to 190g protein, 60g carbs, 32g fat.",
+      "expected_output": "Calls set_targets with a single-date list containing those macros and without inventing a kcal figure. Reports back the derived energy (~1288 kcal via Atwater, from the tool's kcal_derived_for) rather than claiming calories are missing or that the tool stored zero.",
+      "files": []
+    },
+    {
       "id": 6,
-      "prompt": "let's start a cut, I want to lose about a pound a week",
-      "expected_output": "Calls set_goal with mode='cut', rate_lb_per_week=-1.0 (negative, per the stated sign convention), and picks and states explicit protein_g_per_lb/fat_g_per_lb_floor values with a brief rationale rather than silently choosing numbers or asking the server for a default (there isn't one). Asks for or reasonably infers stop_metric/stop_value rather than guessing a target weight/date the user never gave.",
+      "prompt": "I'm doing a fat-cycling thing: Monday/Wednesday/Friday are training days at 32g fat, Tuesday/Thursday are rest days at 20g fat, Saturday is a refeed at 50g fat. Protein's 190g every day, carbs fill the rest to about 2200-1900-2500 depending on the day. Can you set that up for the next two weeks?",
+      "expected_output": "Does not look for a day-type or recurring-pattern tool -- none exists. Translates the pattern into explicit per-date entries and calls set_targets once with the full two-week list (14 dates), each with the correct protein/carb/fat for that day-of-week. Does not ask the server to remember a weekday pattern; Claude owns the cadence.",
       "files": []
     },
     {
       "id": 7,
-      "prompt": "how's my cut going, will I hit my goal in time?",
-      "expected_output": "Calls get_goal(). Reports progress and projected_completion honestly, including surfacing a null projected_completion with its reason (e.g. current trend isn't moving toward the goal) rather than inventing an estimate. Does not claim the goal is complete or transitioned just because stop_condition_met is true -- reports the fact and asks what's next.",
+      "prompt": "get_day is returning targets: null for today. Is that broken?",
+      "expected_output": "Reads targets_null_reason rather than inferring build state. Explains the reason is simply that no target has been set for today ('no targets set for {date} (see set_targets)'), that the capability is fully built, and offers to call set_targets. Does not tell the user the feature is unimplemented, and does not start hand-calculating macros in chat as a workaround.",
       "files": []
     },
     {
       "id": 8,
-      "prompt": "Mondays and Thursdays are my heavy lifting days, can you set that up and tell me what I should eat today (it's Monday)?",
-      "expected_output": "Calls set_training_plan with weekday 0 (Monday) and 3 (Thursday) mapped to 'heavy'. Then calls get_targets or get_day for today and reports the real resolved targets with day_type='heavy' -- or, if no goal is active yet or TDEE/weight data isn't available, reports the specific targets_null_reason instead of guessing macros.",
+      "prompt": "Am I actually hitting my targets this month, or just averaging out?",
+      "expected_output": "Calls get_trend with an appropriate days window. Reports mean_deviation (bias) and mean_abs_deviation (scatter) as two separate numbers rather than collapsing them -- explains that a small bias with large scatter (wild swings) is a different situation than a small bias with tight scatter, even if the average looks similar. If suppressed_reason is present (too few complete days), reports it plainly instead of computing anything from the partial data.",
       "files": []
     },
     {
       "id": 9,
-      "prompt": "get_day is returning targets: null. Is the target engine not built yet?",
-      "expected_output": "Reads targets_null_reason rather than inferring build state. If it says 'no active goal set', explains the engine IS built and the blocker is an unset goal, then offers to call set_goal. Explicitly does NOT tell the user the feature is unimplemented, and does not start hand-calculating macros in chat as a substitute.",
+      "prompt": "Can you show me a chart of my calories vs target for the last month?",
+      "expected_output": "Calls render_trend(days=30, metric='kcal', chart='line') and displays the returned SVG directly. If svg is null, reports the svg_null_reason (e.g. nothing plottable in the window) rather than describing a chart that wasn't actually generated.",
       "files": []
     },
     {
       "id": 10,
-      "prompt": "I already run fixed macros by day type -- 190P every day, carbs and fat varying by training/rest. Should I switch to this system's goal thing or keep what I have?",
-      "expected_output": "Does not present this as either/or. Explains set_goal and explicit set_day_plan macros compose: set the goal now so TDEE starts accumulating, keep pushing explicit macros for days being eaten to, and migrate a day at a time by dropping overrides. Notes explicit days still count against the weekly budget (excluded from carb distribution, not from accounting).",
+      "prompt": "Here's a photo of me from this morning, front view -- can you save it and tell me if my arms look bigger than last month?",
+      "expected_output": "Calls log_body_photo with angle='front' and today's date. Does not attempt to visually compare the new photo against a past one itself or render an image -- there is no tool that returns a photo into chat. Points the user at their /dashboard page to actually view the aligned comparison, and reports align_status/align_reason from the tool's response without treating a failed alignment as a save failure (the photo is stored either way).",
       "files": []
     },
     {
       "id": 11,
-      "prompt": "My weight has been flat for four weeks but my waist is down an inch. What will the TDEE estimate tell me?",
-      "expected_output": "Explains that with flat weight the weight-change term is ~0, so TDEE converges on mean intake -- confirming rather than revealing. Explicitly flags that energy balance cannot see recomposition, so it will report maintenance while missing real composition progress, and does not let that read as 'nothing is happening'. Suggests log_body_comp as the signal that catches what the scale hides.",
+      "prompt": "What should my calorie target even be? Can you calculate my TDEE?",
+      "expected_output": "Does not call any macro-mcp tool expecting a TDEE or expenditure calculation -- no such tool exists (see 'What this skill does not do'). Explains that TDEE/target derivation is Claude's own judgment to make from the conversation (activity level, goals, garmin-mcp data if connected) rather than a server capability, proposes a number with reasoning, and if the user agrees, calls set_targets to store it -- doesn't claim the server calculated it.",
       "files": []
     },
     {
       "id": 12,
-      "prompt": "Set tomorrow to 190g protein, 60g carbs, 32g fat.",
-      "expected_output": "Calls set_day_plan with those macros and without inventing a kcal figure. Reports back the derived energy (~1288 kcal via Atwater) that the tool returns, rather than claiming calories are missing or that the tool stored zero.",
+      "prompt": "Fix that last entry, the chicken was actually 250g not 200g",
+      "expected_output": "Uses the entry_id/item_id from the most recent log_food/log_from_library response or a fresh get_day call to identify the correct item -- does not assume the just-logged meal is first or last in get_day's entry list, since entries are chronological across the whole day, not by log order in this conversation. Calls edit_item with the corrected values.",
       "files": []
     }
   ]
