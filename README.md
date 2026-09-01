@@ -1,5 +1,7 @@
 # macro-coach
 
+> **Unofficial and unaffiliated.** Not affiliated with or endorsed by any nutrition or fitness company. This is a documentation-only Claude Skill — the only code here is `package.py`, a standard-library-only bundler.
+
 A Claude Skill that teaches Claude how to log food and track macro targets correctly through
 [macro-mcp](https://github.com/frictionlesscode/macro-mcp) — a companion MCP server that stores
 whatever macro targets you set per date, logs food against them, computes trend/adherence
