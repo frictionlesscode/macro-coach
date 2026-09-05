@@ -1,0 +1,77 @@
+{
+  "skill_name": "macro-coach",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "just had 2 eggs and toast with butter for breakfast",
+      "expected_output": "Calls log_food with meal='breakfast' and separate items for eggs, toast, and butter (not one merged item). Each item gets source='estimate' and a confidence of 'medium' or 'low', not 'high', since no label or scale weight was given. Does not silently mark the day complete.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "log the same breakfast as yesterday -- oatmeal with protein powder",
+      "expected_output": "Calls search_library (or recognizes an already-known food from context) before re-estimating from scratch, and if a match exists, uses log_from_library with an exact quantity so the entry gets source='library' with the library's exact stored macros, not a fresh estimate.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "how'd my week of eating look?",
+      "expected_output": "Calls get_intake_trend(days=7) (or similar). Describes days with kcal:null as 'not logged', never as 'zero calories' or a low-calorie day. Does not compute its own average across partial/unlogged days.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "I weighed myself with my body-fat scale this morning, 17.8%, and can you send that to Garmin too?",
+      "expected_output": "Calls log_body_comp(percent_fat=17.8, method='scale', push_to_garmin=True). Reports back that the reading was saved, but explicitly tells the user the Garmin push has no real effect right now (tested and found non-functional, per macro-mcp SPEC.md M4) rather than claiming it was sent to Garmin.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "Set tomorrow to 190g protein, 60g carbs, 32g fat.",
+      "expected_output": "Calls set_targets with a single-date list containing those macros and without inventing a kcal figure. Reports back the derived energy (~1288 kcal via Atwater, from the tool's kcal_derived_for) rather than claiming calories are missing or that the tool stored zero.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "I'm doing a fat-cycling thing: Monday/Wednesday/Friday are training days at 32g fat, Tuesday/Thursday are rest days at 20g fat, Saturday is a refeed at 50g fat. Protein's 190g every day, carbs fill the rest to about 2200-1900-2500 depending on the day. Can you set that up for the next two weeks?",
+      "expected_output": "Does not look for a day-type or recurring-pattern tool -- none exists. Translates the pattern into explicit per-date entries and calls set_targets once with the full two-week list (14 dates), each with the correct protein/carb/fat for that day-of-week. Does not ask the server to remember a weekday pattern; Claude owns the cadence.",
+      "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "get_day is returning targets: null for today. Is that broken?",
+      "expected_output": "Reads targets_null_reason rather than inferring build state. Explains the reason is simply that no target has been set for today ('no targets set for {date} (see set_targets)'), that the capability is fully built, and offers to call set_targets. Does not tell the user the feature is unimplemented, and does not start hand-calculating macros in chat as a workaround.",
+      "files": []
+    },
+    {
+      "id": 8,
+      "prompt": "Am I actually hitting my targets this month, or just averaging out?",
+      "expected_output": "Calls get_trend with an appropriate days window. Reports mean_deviation (bias) and mean_abs_deviation (scatter) as two separate numbers rather than collapsing them -- explains that a small bias with large scatter (wild swings) is a different situation than a small bias with tight scatter, even if the average looks similar. If suppressed_reason is present (too few complete days), reports it plainly instead of computing anything from the partial data.",
+      "files": []
+    },
+    {
+      "id": 9,
+      "prompt": "Can you show me a chart of my calories vs target for the last month?",
+      "expected_output": "Calls render_trend(days=30, metric='kcal', chart='line') and displays the returned SVG directly. If svg is null, reports the svg_null_reason (e.g. nothing plottable in the window) rather than describing a chart that wasn't actually generated.",
+      "files": []
+    },
+    {
+      "id": 10,
+      "prompt": "Here's a photo of me from this morning, front view -- can you save it and tell me if my arms look bigger than last month?",
+      "expected_output": "Calls log_body_photo with angle='front' and today's date. Does not attempt to visually compare the new photo against a past one itself or render an image -- there is no tool that returns a photo into chat. Points the user at their /dashboard page to actually view the aligned comparison, and reports align_status/align_reason from the tool's response without treating a failed alignment as a save failure (the photo is stored either way).",
+      "files": []
+    },
+    {
+      "id": 11,
+      "prompt": "What should my calorie target even be? Can you calculate my TDEE?",
+      "expected_output": "Does not call any macro-mcp tool expecting a TDEE or expenditure calculation -- no such tool exists (see 'What this skill does not do'). Explains that TDEE/target derivation is Claude's own judgment to make from the conversation (activity level, goals, garmin-mcp data if connected) rather than a server capability, proposes a number with reasoning, and if the user agrees, calls set_targets to store it -- doesn't claim the server calculated it.",
+      "files": []
+    },
+    {
+      "id": 12,
+      "prompt": "Fix that last entry, the chicken was actually 250g not 200g",
+      "expected_output": "Uses the entry_id/item_id from the most recent log_food/log_from_library response or a fresh get_day call to identify the correct item -- does not assume the just-logged meal is first or last in get_day's entry list, since entries are chronological across the whole day, not by log order in this conversation. Calls edit_item with the corrected values.",
+      "files": []
+    }
+  ]
+}
